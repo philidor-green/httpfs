@@ -8,14 +8,19 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/spf13/afero"
 )
 
 func TestMain(t *testing.T) {
 	filePath := "file.jpg"
 	fieldName := "file"
+	var AppFs = afero.NewMemMapFs()
+
 	body := new(bytes.Buffer)
 	mw := multipart.NewWriter(body)
-	file, err := os.Open(filePath)
+	afero.WriteFile(AppFs, filePath, []byte("hello world"), 0644)
+	file, err := AppFs.Create(filePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,10 +37,15 @@ func TestMain(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/", body)
 	req.Header.Add("Content-Type", mw.FormDataContentType())
 	res := httptest.NewRecorder()
-	handler := processFile()
+	handler := processFile(AppFs)
 
 	handler.ServeHTTP(res, req)
 	if res.Code != 200 {
 		t.Errorf("Expected %d, received %d", 200, res.Code)
+	}
+	fileName := "downloaded"
+	_, err = AppFs.Stat(fileName)
+	if os.IsNotExist(err) {
+		t.Errorf("file \"%s\" does not exist.\n", fileName)
 	}
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+	"github.com/spf13/afero"
 )
 
 const MB = 1 << 20
@@ -16,12 +17,14 @@ const MB = 1 << 20
 func main() {
 	r := &Router{&mux.Router{}}
 
-	r.MustResponse("POST", "/", processFile())
+	var AppFs = afero.NewOsFs()
+
+	r.MustResponse("POST", "/", processFile(AppFs))
 
 	r.Run(":8080", "*")
 }
 
-func processFile() http.HandlerFunc {
+func processFile(fs afero.Fs) http.HandlerFunc {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		if err := req.ParseMultipartForm(50 * MB); nil != err {
 			log.Printf("while parse %s", err)
@@ -38,7 +41,7 @@ func processFile() http.HandlerFunc {
 
 		for _, fheaders := range req.MultipartForm.File {
 			for _, hdr := range fheaders {
-				log.Printf("Income file len: %d", hdr.Size)
+				log.Printf("Income file: %s", hdr.Filename)
 
 				infile, err := hdr.Open()
 				if err != nil {
@@ -48,7 +51,7 @@ func processFile() http.HandlerFunc {
 				}
 				defer infile.Close()
 
-				f, err := os.OpenFile("./downloaded", os.O_WRONLY|os.O_CREATE, 0666)
+				f, err := fs.OpenFile("./download", os.O_WRONLY|os.O_CREATE, 0666)
 				if err != nil {
 					log.Printf("Create Read Input error %v", err)
 					res.WriteHeader(http.StatusInternalServerError)
